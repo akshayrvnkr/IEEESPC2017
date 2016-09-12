@@ -10,20 +10,21 @@ x = mean(x,2); % convert to mono if necessary
 if (fs~=44100),
     x = resample(x,44100,fs);
 end
-disp('read input file');
+%disp('read input file');
 
 p = bt_parms; % read in beat tracking parameters
 
 df = onset_detection_function(x,p); % calculate the onset detection function
-disp('onset detection function calculated');
+%disp('onset detection function calculated');
 
 % get periodicity path
 ppath = periodicity_path(df,p);
-disp('tempo estimation done');
+%disp('tempo estimation done');
 
 % find beat locations
 beats = dynamic_programming(df,p,ppath);
-disp('beat tracking completed');
+%disp('beat tracking completed');
+
 
 % sub-functions, for simplicity all included in the same file
 function p = bt_parms(res)
@@ -50,6 +51,8 @@ p.pre = round(7*(512/p.timeres));
 p.post = p.pre;
 % factor for converting between beat period and tempo
 p.fact = 60*p.fs/p.timeres;
+
+
 function df = onset_detection_function(x,p)
 
 % function to calculate the following onset detection function
@@ -107,8 +110,10 @@ while pin<pend
     % move to next frame
     pin = pin+o_step;
 end
+
 % now interpolate each detection function by a factor of 2 to get resolution of 11.6ms
 df = interp1((0:length(df)-1)*p.timeres/p.fs,df,(0:0.5:length(df)-1)*p.timeres/p.fs,'cubic');
+
 function phase=princarg(phasein)
 %phase=princarg(phasein) maps phasein into the [-pi:pi] range
 phase=mod(phasein+pi,-2*pi)+pi;
@@ -377,7 +382,7 @@ while backlink(b(end)) > 0
 end
 
 % put the beat times into seconds
-beats = sort(b*512);%*512/44100;
+beats = sort(b)*512/44100;
 
 function [alignment] = getalignment2(dfframe,phwv,period)
 
