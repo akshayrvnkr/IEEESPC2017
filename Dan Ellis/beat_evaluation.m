@@ -1,6 +1,5 @@
 function score = beat_evaluation(inputfile)
 
-
 params.minBeatTime = 3;
 % size of tolerance window for beat phase in continuity based evaluation
 params.continuityBased.phaseThresh = 0.175;
