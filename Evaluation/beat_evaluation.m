@@ -1,4 +1,4 @@
-function score = beat_evaluation(gt,out)
+function score = beat_evaluation(gt,out,End)
 
 params.minBeatTime = 3;
 % size of tolerance window for beat phase in continuity based evaluation
@@ -9,6 +9,10 @@ params.continuityBased.periodThresh = 0.175;
 beats = textread(out); %read in the tapped beat times
 beats = beats(:,1);
 anns = textread(gt);
+if(End==[])
+    End=max(anns);
+end;
+anns(find(anns>End))=[];
 
 [cmlC,cmlT,amlC,amlT] = be_continuityBased(anns,beats,params);
 

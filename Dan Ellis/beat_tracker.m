@@ -1,17 +1,8 @@
-function beats = beat_tracker(filename)
+function beats = beat_tracker(x,fs)
 %
 % function beats = beat_tracker(filename)
 %
 % this function calculates beat times in seconds from an input wavefile
-
-[x fs] = audioread(filename); % read in the input audio file
-x = mean(x,2); % convert to mono if necessary
-% in case x is not at 44khz we can resample it
-if (fs~=44100),
-    x = resample(x,44100,fs);
-end
-%disp('read input file');
-
 p = bt_parms; % read in beat tracking parameters
 
 df = onset_detection_function(x,p); % calculate the onset detection function
