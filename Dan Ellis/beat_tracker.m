@@ -22,6 +22,7 @@ function p = bt_parms(res)
 %  parameters for the beat tracker
 if nargin<1
     res = 0.01161;
+   % res=1;
 end
 
 p.fs = 44100;
@@ -45,7 +46,6 @@ p.fact = 60*p.fs/p.timeres;
 
 
 function df = onset_detection_function(x,p)
-
 % function to calculate the following onset detection function
 % df = complex spectral difference
 
@@ -104,6 +104,7 @@ end
 
 % now interpolate each detection function by a factor of 2 to get resolution of 11.6ms
 df = interp1((0:length(df)-1)*p.timeres/p.fs,df,(0:0.5:length(df)-1)*p.timeres/p.fs,'cubic');
+%df = interp1((0:length(df)-1)*p.timeres/p.fs,df,(0:length(df)/length(x):length(df)-1)*p.timeres/p.fs,'cubic');
 
 function phase=princarg(phasein)
 %phase=princarg(phasein) maps phasein into the [-pi:pi] range
@@ -219,7 +220,7 @@ function [M, z] = normalise(A, dim)
 if nargin < 2
     z = sum(A(:));
     % Set any zeros to one before dividing
-    % This is valid, since c=0 => all i. A(i)=0 => the answer should be 0/1=0
+    % This is vfalid, since c=0 => all i. A(i)=0 => the answer should be 0/1=0
     s = z + (z==0);
     M = A / s;
 elseif dim==1 % normalize each column
@@ -287,9 +288,6 @@ df = df-m;
 dfout = (df>0).*df;
 
 function [rcf] = getperiod(acf,wv,timesig,step,pmin,pmax)
-
-
-
 rcf = zeros(1,step);
 
 if(~timesig) % timesig unknown, must be general state
