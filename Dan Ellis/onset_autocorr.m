@@ -1,4 +1,4 @@
-function df = onset(x,fs)
+function df = onset_autocorr(x,fs)
 % function to calculate the following onset detection function
 % df = complex spectral difference
 p=bt_parms;
@@ -33,7 +33,7 @@ while pin<pend
     k=k+1;
     % calculate windowed fft frame
     segment = x(pin+1:pin+o_winlen);
-    X = fft(fftshift(win.*segment));
+    X = fftshift(fft(win.*segment));
     
     % discard first half of the spectrum
     X = X(floor(length(X)/2)+1:length(X),:);
@@ -53,22 +53,11 @@ while pin<pend
     pin = pin+o_step;
 end
 df=adapt_thresh(df);
-[pks,locs] = findpeaks(df,'SortStr','descend');
-n=1:length(df);
-for k=2:length(locs)
-    impls=zeros(1,length(df));
-    impls(locs(1:k))=(pks(1)+pks(2))/2;
-    cost(k)=sum((df-impls).^2);
-    if(cost(k)>cost(k-1)&&k>3)
-        k=k-1;
-        locs=locs(1:k);
-        break;
-    end;
-end;
-[posmax,
-locs=sort(locs);
-timeper=round(median(diff(locs)));
-lastpea=locs(max(pks));
+df=spline(1:length(x)/length(df):length(x),df,1:length(x));
+acorr=xcorr(df);
+acorr=acorr(round(length(acorr)/2):end);
+beatrange=44100/3:44100;
+[pks,locs] = findpeaks(acorr(beatrange),'SortStr','descend');
 end
 
 
