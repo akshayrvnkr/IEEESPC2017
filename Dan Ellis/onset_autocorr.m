@@ -1,4 +1,7 @@
-function df = onset_autocorr(x,fs)
+function [pos,bpm] = onset_autocorr(x,fs)
+% files=dir('/media/chaithya/Studies Related/Projects/SPC-2017/training_set/open/*.wav');
+% for i=1:length(files)
+%     [x,fs]=audioread(sprintf('/media/chaithya/Studies Related/Projects/SPC-2017/training_set/open/%s',files(i).name));
 % function to calculate the following onset detection function
 % df = complex spectral difference
 p=bt_parms;
@@ -53,13 +56,16 @@ while pin<pend
     pin = pin+o_step;
 end
 df=adapt_thresh(df);
-df=spline(1:length(x)/length(df):length(x),df,1:length(x));
+%df=spline(1:length(x)/length(df):length(x),df,1:length(x));
+conver=length(x)/length(df);
 acorr=xcorr(df);
 acorr=acorr(round(length(acorr)/2):end);
-beatrange=44100/3:44100;
+beatrange=round(44100/(3*conver)):round(44100/conver);
 [pks,locs] = findpeaks(acorr(beatrange),'SortStr','descend');
+bpm=44100/(3*conver)+locs(1)-1;
+pos=getglobalcost(df,bpm);
+pos=round(pos*conver);
 end
-
 
 function [dfout,m] = adapt_thresh(df,pre,post)
 
