@@ -31,8 +31,10 @@ class ExampleApp(QtGui.QMainWindow, ui_main.Ui_MainWindow):
             self.grPCM.plot(self.ear.datax,self.ear.data,
                             pen=pen,clear=True)
             pen=pyqtgraph.mkPen(color='r')
-            self.grFFT.plot(self.ear.fftx[:500],self.ear.fft[:500],
-                            pen=pen,clear=True)
+            self.grFFT.plot(self.ear.fftx, self.ear.fft,
+                            pen=pen, clear=True)
+            # self.grFFT.plot(self.ear.fftx[:500],self.ear.fft[:500],
+            #                 pen=pen,clear=True)
         QtCore.QTimer.singleShot(1, self.update) # QUICKLY repeat
 
 if __name__=="__main__":
