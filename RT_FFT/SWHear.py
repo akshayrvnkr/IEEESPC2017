@@ -29,7 +29,8 @@ class SWHear(object):
         self.chunk = chunk #2048 # number of data points to read at a time
         self.device=device
         self.rate=rate
-
+        self.adaptval=15;
+        self.tdf=[];
     ### SYSTEM TESTS
 
     def valid_low_rate(self,device):
@@ -102,17 +103,11 @@ class SWHear(object):
         """"reads some audio and re-launches itself"""
         try:
             self.data = np.fromstring(self.stream.read(self.chunk),dtype=np.int16)
-            # self.fftx, self.fft =  self.rt_onset()
-            #current_thread_ident=threading.currentThread().ident
-            # print(threading.current_thread())#self.acorr= onset_timer.onset_detection(self.data,self.rate)
-            # plt.plot(self.acorr)
-            # plt.show(self.acorr.any)
         except Exception as E:
             print(" -- exception! terminating...")
             print(E,"\n"*5)
             self.keepRecording=False
         if self.keepRecording:
-            #self.stream_readchunk()
             self.stream_thread_new()
         else:
             self.stream.close()
@@ -127,7 +122,6 @@ class SWHear(object):
 
     def stream_thread_onset(self):
         self.t2 = threading.Thread(target=self.rt_onset)
-        # self.t.daemon=True
         self.t2.start()
 
     def stream_start(self):
@@ -136,121 +130,58 @@ class SWHear(object):
         print(" -- starting stream")
         self.keepRecording=True # set this to False later to terminate stream
         self.data=None # will fill up with threaded recording data
-        # self.data_prev = None
-        #self.data_temp = None
         self.fft=None
-        # self.dataFiltered=None #same
         self.stream=self.p.open(format=pyaudio.paInt16,channels=1,
                       rate=self.rate,input=True,frames_per_buffer=self.chunk)
-
-        #self.data_temp = np.fromstring(self.stream.read(self.chunk), dtype=np.int16)
-
         self.stream_thread_new()
         self.stream_thread_onset()
 
     def rt_onset(self):
         start = time.time()
-        # ear = SWHear()
         o_step = 1024  # 1024
         o_win_len = o_step * 2
         hlf_win = np.int(o_win_len / 2)
-        # self.stream_start()  # goes forever
         time.sleep(0.400)
         prev_data = self.data
-        # print(prev_data,np.size(prev_data))
         time.sleep(0.030)
-        # theta1 = np.zeros(hlf_win)
-        # theta2 = theta1
-        # oldmag = theta1
-        # df = []
-        count = 0
         while True:
             start = time.time()
             theta1 = np.zeros(hlf_win)
             theta2 = theta1
             oldmag = theta1
             df = []
-            # count = 0
-            while (time.time() - start) < 1:
-                # count = count+1
-                # start_time = time.time()
+            while True:
                 current_data = self.data
-                # print(current_data,np.size(current_data))
-                # print(ear.data, type(ear.data))
                 temp, theta1, theta2, oldmag = onset_timer.onset_detection(np.array(np.append(prev_data, current_data)),
                                                                            theta1, theta2, oldmag, self.rate)
                 df = df + [temp]
-                # print(type(temp),type(df))
-                # print(onset_timer.simple(np.array(np.append(prev_data,current_data))))
-                # plt.plot(acorr)
-                # plt.show(acorr.any)
-                # while (time.time() - cur_tim) <(ear.chunk/ear.rate):
-                #     t = 1
-                # stop_time = time.time()
-                time.sleep(0.010)
+                time.sleep(0.001)
                 prev_data = current_data
-            # print (df)
-            df = onset_timer.adapt_threshold(df)
-            acorr = np.correlate(df, df, "full")
-            acorr = acorr[np.int(len(acorr) / 2):len(acorr)]
-            # plt.plot(acorr)
-            # plt.show(acorr.any)
-            self.fft = acorr
-            self.fftx = np.arange(len(acorr))
-            # print("DONE")
+                if(len(df)>=self.adaptval):
+                    if(len(self.tdf)>=800):
+                        self.tdf=self.tdf[self.adaptval+1:len(self.tdf)];
+                    df = np.array(onset_timer.adapt_threshold(df))
+                    self.tdf=np.concatenate((self.tdf,df),axis=0);
+                    df=[];
+                    #acorr = np.correlate(df, df, "full")
+                    #acorr = acorr[np.int(len(acorr) / 2):len(acorr)]
+                    #print(self.tdf)
+                    #plt.plot(self.tdf)
+                    #plt.show(self.tdf)
+                    #time.sleep(1)
+                    #self.fft = acorr
+                    #self.fftx = np.arange(len(acorr))
+                    # print("DONE")
 
 
 if __name__=="__main__":
     ear = SWHear()
     ear.stream_start()  # goes forever
+    plt.ion()
     while True:
-        print(ear.data)
-        time.sleep(.1)
+        plt.clf()
+        plt.plot(ear.tdf)
+        plt.show()
+        plt.pause(0.001)
+        plt.draw()
     print("DONE")
-    # start = time.time()
-    # ear=SWHear()
-    # o_step = 1024  # 1024
-    # o_win_len = o_step * 2
-    # hlf_win  	= np.int(o_win_len / 2)
-    # ear.stream_start() #goes forever
-    # time.sleep(0.400)
-    # prev_data = ear.data
-    # #print(prev_data,np.size(prev_data))
-    # time.sleep(0.200)
-    # theta1 		= np.zeros(hlf_win)
-    # theta2		= theta1
-    # oldmag		= theta1
-    # df =[]
-    # count =0
-    # while True:
-    #     theta1 = np.zeros(hlf_win)
-    #     theta2 = theta1
-    #     oldmag = theta1
-    #     df = []
-    #     # count = 0
-    #     while (time.time() - start) < 2:
-    #         # count = count+1
-    #         start_time = time.time()
-    #         current_data = ear.data
-    #         # print(current_data,np.size(current_data))
-    #         #print(ear.data, type(ear.data))
-    #         temp, theta1, theta2, oldmag  = onset_timer.onset_detection(np.array(np.append(prev_data,current_data)),theta1, theta2, oldmag, ear.rate)
-    #         df = df + [temp]
-    #         # print(type(temp),type(df))
-    #         #print(onset_timer.simple(np.array(np.append(prev_data,current_data))))
-    #         # plt.plot(acorr)
-    #         # plt.show(acorr.any)
-    #         # while (time.time() - cur_tim) <(ear.chunk/ear.rate):
-    #         #     t = 1
-    #         stop_time = time.time()
-    #         time.sleep(ear.chunk/ear.rate- (stop_time-start_time))
-    #         prev_data = current_data
-    #     # print (count)
-    #     df = onset_timer.adapt_threshold(df)
-    #     acorr = np.correlate(df,df,"full")
-    #     acorr = acorr[np.int(len(acorr)/2):len(acorr)]
-    #     # plt.plot(acorr)
-    #     # plt.show(acorr.any)
-    #     ear.fft = acorr
-    #     ear.fftx = len(acorr)
-    #     # print("DONE")
