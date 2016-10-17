@@ -4,6 +4,8 @@ import time
 import numpy as np
 import threading
 import onset_timer
+from scipy.signal import find_peaks_cwt
+#from detect_peaks import detect_peaks
 import matplotlib.pyplot as plt
 #import scipy
 #import scipy.fftpack
@@ -29,8 +31,11 @@ class SWHear(object):
         self.chunk = chunk #2048 # number of data points to read at a time
         self.device=device
         self.rate=rate
-        self.adaptval=15;
+        self.adaptval=15;#TODO error for not Equal to 15 fix
+        self.conver=1024; #Length of step size...
         self.tdf=[];
+        self.acorrwin=85;
+        self.bpm=[];
     ### SYSTEM TESTS
 
     def valid_low_rate(self,device):
@@ -124,6 +129,11 @@ class SWHear(object):
         self.t2 = threading.Thread(target=self.rt_onset)
         self.t2.start()
 
+    def stream_thread_getbpm(self):
+        self.t3 = threading.Thread(target=self.getbpm)
+        self.t3.start()
+
+
     def stream_start(self):
         """adds data to self.data until termination signal"""
         self.initiate()
@@ -135,6 +145,7 @@ class SWHear(object):
                       rate=self.rate,input=True,frames_per_buffer=self.chunk)
         self.stream_thread_new()
         self.stream_thread_onset()
+        self.stream_thread_getbpm()
 
     def rt_onset(self):
         start = time.time()
@@ -163,25 +174,27 @@ class SWHear(object):
                     df = np.array(onset_timer.adapt_threshold(df))
                     self.tdf=np.concatenate((self.tdf,df),axis=0);
                     df=[];
-                    #acorr = np.correlate(df, df, "full")
-                    #acorr = acorr[np.int(len(acorr) / 2):len(acorr)]
-                    #print(self.tdf)
-                    #plt.plot(self.tdf)
-                    #plt.show(self.tdf)
-                    #time.sleep(1)
-                    #self.fft = acorr
-                    #self.fftx = np.arange(len(acorr))
-                    # print("DONE")
 
+    def getbpm(self):
+        while True:
+            print()
+            if(len(self.tdf)>self.acorrwin):
+                acorr = np.correlate(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],"full")
+                acorr = acorr[np.int(len(acorr)/2):len(acorr)]
+                plt.clf()
+                plt.plot(acorr)
+                plt.show()
+                plt.pause(0.001)
+                plt.draw()
+                #beatrange = np.around(np.arange(44100/3,44100)/self.conver)
+                #locs = find_peaks_cwt(beatrange,np.arange(1,10))
+                #locs = detect_peaks(beatrange, mph=1, mpd=1)
+                #self.bpm=locs
 
 if __name__=="__main__":
     ear = SWHear()
-    ear.stream_start()  # goes forever
     plt.ion()
+    ear.stream_start()  # goes forever
     while True:
-        plt.clf()
-        plt.plot(ear.tdf)
-        plt.show()
-        plt.pause(0.001)
-        plt.draw()
+        time.sleep(0.001)
     print("DONE")
