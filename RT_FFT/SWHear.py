@@ -4,6 +4,7 @@ import time
 import numpy as np
 import threading
 import onset_timer
+from detect_peaks import detect_peaks
 from scipy.signal import find_peaks_cwt
 #from detect_peaks import detect_peaks
 import matplotlib.pyplot as plt
@@ -107,7 +108,7 @@ class SWHear(object):
     def stream_readchunk(self):
         """"reads some audio and re-launches itself"""
         try:
-            self.data = np.fromstring(self.stream.read(self.chunk),dtype=np.int16)
+            self.data = np.fromstring(self.stream.read(self.chunk),dtype=np.int16)/1024
         except Exception as E:
             print(" -- exception! terminating...")
             print(E,"\n"*5)
@@ -181,8 +182,10 @@ class SWHear(object):
             if(len(self.tdf)>self.acorrwin):
                 acorr = np.correlate(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],"full")
                 acorr = acorr[np.int(len(acorr)/2):len(acorr)]
+                peaks = detect_peaks(acorr,mph=0, mpd=4)# for info look as detect_peaks
                 plt.clf()
-                plt.plot(acorr)
+                plt.plot(range(np.size(acorr)),acorr)
+                plt.scatter(peaks,acorr[peaks])
                 plt.show()
                 plt.pause(0.001)
                 plt.draw()
@@ -196,5 +199,6 @@ if __name__=="__main__":
     plt.ion()
     ear.stream_start()  # goes forever
     while True:
+        print(ear.data)
         time.sleep(0.001)
     print("DONE")
