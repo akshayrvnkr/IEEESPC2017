@@ -2,10 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5ea97463-2c3f-41a6-987b-00b71f576aef" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/IEEESPC2017.iml" afterPath="$PROJECT_DIR$/.idea/IEEESPC2017.iml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/misc.xml" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/RT_FFT/SWHear.py" afterPath="$PROJECT_DIR$/RT_FFT/SWHear.py" />
     </list>
     <ignored path="IEEESPC2017.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -373,7 +370,14 @@
       <option name="project" value="LOCAL" />
       <updated>1476818937177</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="onset with detect_peaks... Just run SWHear.py">
+      <created>1477289026944</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1477289026944</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="ToolWindowManager">
