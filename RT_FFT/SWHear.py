@@ -1,42 +1,29 @@
 import pyaudio
 import time
-#import pylab
 import numpy as np
 import threading
 import onset_timer
 from detect_peaks import detect_peaks
 from scipy.signal import find_peaks_cwt
-#from detect_peaks import detect_peaks
 import matplotlib.pyplot as plt
-#import scipy
-#import scipy.fftpack
 
-# def getFFT(data,rate):
-#     """Given some data and rate, returns FFTfreq and FFT (half)."""
-#     data=data*np.hamming(len(data))
-#     fft=np.fft.fft(data)
-#     fft=np.abs(fft)
-#     #fft=10*np.log10(fft)
-#     freq=np.fft.fftfreq(len(fft),1.0/rate)
-#     return freq[:int(len(freq)/2)],fft[:int(len(fft)/2)]
 class SWHear(object):
     """
     The SWHear class is made to provide access to continuously recorded
     (and mathematically processed) microphone data.
     """
-
-
     def __init__(self,device=None,rate=None,chunk=1024):
         """fire up the SWHear class."""
         self.p=pyaudio.PyAudio()
         self.chunk = chunk #2048 # number of data points to read at a time
         self.device=device
         self.rate=rate
-        self.adaptval=15;#TODO error for not Equal to 15 fix
+        self.adaptval=15;       #TODO error for not Equal to 15 fix
         self.conver=1024; #Length of step size...
         self.tdf=[];
         self.acorrwin=85;
         self.bpm=[];
+        self.fs=44100
     ### SYSTEM TESTS
 
     def valid_low_rate(self,device):
@@ -178,27 +165,28 @@ class SWHear(object):
 
     def getbpm(self):
         while True:
-            print()
             if(len(self.tdf)>self.acorrwin):
                 acorr = np.correlate(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],"full")
                 acorr = acorr[np.int(len(acorr)/2):len(acorr)]
-                peaks = detect_peaks(acorr,mph=0, mpd=4)# for info look as detect_peaks
-                plt.clf()
-                plt.plot(range(np.size(acorr)),acorr)
-                plt.scatter(peaks,acorr[peaks])
-                plt.show()
-                plt.pause(0.001)
-                plt.draw()
-                #beatrange = np.around(np.arange(44100/3,44100)/self.conver)
-                #locs = find_peaks_cwt(beatrange,np.arange(1,10))
-                #locs = detect_peaks(beatrange, mph=1, mpd=1)
-                #self.bpm=locs
+                #beatrange = np.arange(self.fs/3,self.fs)/ self.conver
+                #print(beatrange)
+                peaks = detect_peaks(acorr(beatrange),mph=0, mpd=4)# for info look as detect_peaks
+                #plt.clf()
+                #plt.plot(range(np.size(acorr)),acorr)
+                #plt.scatter(peaks,acorr[peaks])
+                #plt.show()
+                #plt.pause(0.001)
+                #plt.draw()
 
 if __name__=="__main__":
     ear = SWHear()
     plt.ion()
     ear.stream_start()  # goes forever
     while True:
-        print(ear.data)
-        time.sleep(0.001)
+        if ear.data!=None:
+            plt.plot(ear.data)
+            plt.show()
+            plt.pause(0.1)
+            plt.clf()
+            plt.draw()
     print("DONE")
