@@ -4,6 +4,7 @@ import numpy as np
 import threading
 import onset_timer
 from detect_peaks import detect_peaks
+import getglobalcost
 from scipy.signal import find_peaks_cwt
 import matplotlib.pyplot as plt
 
@@ -21,7 +22,7 @@ class SWHear(object):
         self.adaptval=15;       #TODO error for not Equal to 15 fix
         self.conver=1024; #Length of step size...
         self.tdf=[];
-        self.acorrwin=85;
+        self.acorrwin=100;
         self.bpm=[];
         self.fs=44100
     ### SYSTEM TESTS
@@ -168,21 +169,33 @@ class SWHear(object):
             if(len(self.tdf)>self.acorrwin):
                 acorr = np.correlate(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],"full")
                 acorr = acorr[np.int(len(acorr)/2):len(acorr)]
-                #beatrange = np.arange(self.fs/3,self.fs)/ self.conver
-                #print(beatrange)
-                peaks = detect_peaks(acorr(beatrange),mph=0, mpd=4)# for info look as detect_peaks
-                #plt.clf()
-                #plt.plot(range(np.size(acorr)),acorr)
-                #plt.scatter(peaks,acorr[peaks])
-                #plt.show()
-                #plt.pause(0.001)
-                #plt.draw()
+                beatrange = np.arange(np.round(self.fs/3/self.conver),np.round(self.fs/self.conver), dtype='int32')
+                peaks = detect_peaks(acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
+                #TODO Must choose a better way to select BPM .. (Rayleigh Windowing?)
+                peaks=peaks[np.argmax(acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
+                pos=getglobalcost.getglobalcost(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],peaks)
+                a=self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)]
+                print(pos)
+                plt.clf()
+                plt.plot(range(np.size(a)),a)
+                plt.scatter(pos,a[pos])
+                plt.show()
+                plt.pause(0.001)
+                plt.draw()
+
+                # plt.plot(range(np.size(acorr)),acorr)
+                # plt.scatter(peaks,acorr[peaks])
+                # plt.show()
+                # plt.pause(0.001)
+                # plt.draw()
+
+
 
 if __name__=="__main__":
     ear = SWHear()
     plt.ion()
     ear.stream_start()  # goes forever
-    while True:
+    while False:
         if ear.data!=None:
             plt.plot(ear.data)
             plt.show()
