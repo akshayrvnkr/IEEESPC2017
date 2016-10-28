@@ -23,7 +23,9 @@ class SWHear(object):
         self.conver=1024; #Length of step size...
         self.tdf=[];
         self.acorrwin=100;
-        self.bpm=[];
+        self.bpm=0;
+        self.lentdf=800;
+        self.C=[];#np.zeros((self.lentdf,1))
         self.fs=44100
     ### SYSTEM TESTS
 
@@ -64,8 +66,6 @@ class SWHear(object):
             print("found %d microphone devices: %s"%(len(mics),mics))
         return mics
 
-    ### SETUP AND SHUTDOWN
-
     def initiate(self):
         """run this after changing settings (like rate) before recording"""
         if self.device is None:
@@ -90,8 +90,6 @@ class SWHear(object):
             time.sleep(.1)
         self.stream.stop_stream()
         self.p.terminate()
-
-    ### STREAM HANDLING
 
     def stream_readchunk(self):
         """"reads some audio and re-launches itself"""
@@ -122,7 +120,6 @@ class SWHear(object):
         self.t3 = threading.Thread(target=self.getbpm)
         self.t3.start()
 
-
     def stream_start(self):
         """adds data to self.data until termination signal"""
         self.initiate()
@@ -138,12 +135,12 @@ class SWHear(object):
 
     def rt_onset(self):
         start = time.time()
-        o_step = 1024  # 1024
+        o_step = 1024
         o_win_len = o_step * 2
         hlf_win = np.int(o_win_len / 2)
         time.sleep(0.400)
         prev_data = self.data
-        time.sleep(0.030)
+        time.sleep(self.chunk/self.rate)
         while True:
             start = time.time()
             theta1 = np.zeros(hlf_win)
@@ -155,32 +152,45 @@ class SWHear(object):
                 temp, theta1, theta2, oldmag = onset_timer.onset_detection(np.array(np.append(prev_data, current_data)),
                                                                            theta1, theta2, oldmag, self.rate)
                 df = df + [temp]
-                time.sleep(0.001)
+                time.sleep(self.chunk/self.rate)
                 prev_data = current_data
                 if(len(df)>=self.adaptval):
-                    if(len(self.tdf)>=800):
-                        self.tdf=self.tdf[self.adaptval+1:len(self.tdf)];
+                    if(len(self.tdf)>=self.lentdf):
+                        self.tdf=self.tdf[self.adaptval+1:len(self.tdf)]
                     df = np.array(onset_timer.adapt_threshold(df))
-                    self.tdf=np.concatenate((self.tdf,df),axis=0);
+                    self.assigncost(self,df)
+                    self.tdf=np.concatenate((self.tdf,df),axis=0)
                     df=[];
+
+    def assigncost(self,df):
+            mincost = float('inf')
+            for i in range(len(self.tdf)-self.bpm-1, 0, -1):
+                    cost = self.C[i] + 0.9*sum(pow(np.array(self.tdf[i:len(self.tdf)-1]), 2))
+                    if cost < mincost:
+                        mincost = cost
+            print(mincost)
+            self.C=np.append(self.C[1:len(self.C)-1],[mincost],axis=0)
 
     def getbpm(self):
         while True:
             if(len(self.tdf)>self.acorrwin):
-                acorr = np.correlate(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],"full")
+                a = self.tdf[len(self.tdf) - self.acorrwin + 1:len(self.tdf)];
+                acorr = np.correlate(a,a,"full")
                 acorr = acorr[np.int(len(acorr)/2):len(acorr)]
                 beatrange = np.arange(np.round(self.fs/3/self.conver),np.round(self.fs/self.conver), dtype='int32')
                 peaks = detect_peaks(acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
                 #TODO Must choose a better way to select BPM .. (Rayleigh Windowing?)
-                peaks=peaks[np.argmax(acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
-                pos=getglobalcost.getglobalcost(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],peaks)
-                a=self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)]
-                print(pos)
+                self.bpm=peaks[np.argmax(acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
+                #pos=getglobalcost.getglobalcost(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],peaks)
+                #print(self.C)
                 plt.clf()
                 plt.plot(range(np.size(a)),a)
-                plt.scatter(pos,a[pos])
+                #plt.scatter(pos,a[pos])
+                #plt.plot(self.data)
+                #plt.plot(acorr);
+                #plt.scatter(peaks,acorr[peaks]);
                 plt.show()
-                plt.pause(0.001)
+                plt.pause(self.chunk/self.rate)
                 plt.draw()
 
                 # plt.plot(range(np.size(acorr)),acorr)

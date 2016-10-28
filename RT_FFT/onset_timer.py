@@ -46,48 +46,15 @@ def adapt_threshold(df,pre=8,post=7):
 def onset_detection(x, theta1, theta2, oldmag, fs=44100):
 	o_step  	= 1024  # 1024
 	o_win_len   = o_step * 2
-	# hlf_win  	= np.int(o_win_len / 2)
 	win_hann 	= np.hanning(o_win_len)
-	# N 			= len(x)
-	# pin 		= 0
-	# pend		= N - o_win_len
-
-	# theta1 		= np.zeros(hlf_win)
-	# theta2		= np.zeros(hlf_win)
-	# oldmag		= np.zeros(hlf_win)
-
-	#k = 0
 	df = []
-	#while pin<pend:
-		# k += 1
-		# segment = x[pin : pin+o_win_len]
 	x_fft	= np.fft.fft(win_hann*x)
-	#x_fft	= np.fft.fftshift(x_fft)
 	x_fft	= x_fft[0:np.int(len(x_fft)/2)]
-
 	mag   = (np.absolute(x_fft))
 	theta = np.angle(x_fft)
 	dev   = ((theta-2*theta1+theta2 + np.pi) %  (-2 * np.pi)) + np.pi
 	meas  = oldmag - (mag*np.exp(1j* dev))
 	df = np.sum(np.sqrt(np.power((np.real(meas)),2) + np.power((np.imag(meas)),2)))
-	# % updatevectors
-	# theta2 = theta1
-	# theta1 = theta
-
-	#oldmag = mag
-	# % move
-	# to
-	# next
-	# frame
-	# pin = pin + o_step
-	# df = adapt_threshold(df)
-	#print(np.size(df))
-	# spl_tuple = interpolate.splrep(np.arange(1,len(x),len(x)/len(df)), df, s=0) # s = smoothing
-	# df =  interpolate.splev(np.arange(0,len(x)-1), spl_tuple, der=0)
-	#acorr = np.correlate(df,df,"full")
-	#acorr = acorr[np.int(len(acorr)/2):len(acorr)]
-	# conver=len(x)/len(df)
-	# beatrange = np.arange((44100/3,44100))/conver
 	return (df, theta, theta1, mag)
 
 

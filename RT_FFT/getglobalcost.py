@@ -1,8 +1,5 @@
 import numpy as np
-
-
 def getglobalcost(x,bpm):
-
     T0 = bpm
     L = int(round(len(x)/T0))
     thresh = T0/5
