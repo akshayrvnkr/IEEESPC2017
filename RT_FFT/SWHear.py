@@ -174,9 +174,9 @@ class SWHear(object):
                     self.tdf=self.tdf[self.adaptval+1:len(self.tdf)]
                     self.time_stamps=self.time_stamps[self.adaptval+1:len(self.time_stamps)]
                 df = np.array(onset_timer.adapt_threshold(df))
+                self.time_stamps = np.concatenate((self.time_stamps, ts), axis=0)
                 self.assigncost(df)
                 self.tdf=np.concatenate((self.tdf,df),axis=0)
-                self.time_stamps = np.concatenate((self.time_stamps, ts), axis=0)
                 df=[]
                 ts=[]
                 if timdif!=0:
@@ -230,7 +230,7 @@ class SWHear(object):
                 peaks = detect_peaks(acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
                 #TODO Must choose a better way to select BPM .. (Rayleigh Windowing?)
                 self.bpm=peaks[np.argmax(acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
-
+                #time.sleep(0.5*self.bpm*self.conver/44100)
 
                 #pos=getglobalcost.getglobalcost(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],peaks)
                 #print(self.C)
