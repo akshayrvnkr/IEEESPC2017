@@ -169,7 +169,7 @@ class SWHear(object):
                 time.sleep(self.chunk/self.rate)#-progend+begn)
             except:
                 print('Error: Algo took too Long...!!!')
-                #TODO what to todo???... very rare case
+                #TODO: what to todo???... very rare case
             prev_data = current_data
             if(len(df)>=self.adaptval):
                 if(len(self.tdf)>=self.lentdf):
