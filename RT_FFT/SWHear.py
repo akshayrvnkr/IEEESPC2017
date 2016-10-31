@@ -214,7 +214,7 @@ class SWHear(object):
             try:
                 time.sleep(self.bpm*self.conver/self.rate-(present_time-self.time_stamps[self.lastbeat]))
                 self.BT = np.append(self.BT, [time.time() - self.Start], axis=0)
-                #print(self.BT)
+                print(self.BT)
             except:
                 time.sleep(0.1)
 
@@ -246,7 +246,7 @@ if __name__=="__main__":
     plt.ion()
     ear.stream_start()  # goes forever
     time.sleep(5)
-    while True:
+    while False:
         if ear.tdf!=[]:
             print(time.time()-ear.time_stamps[ear.lastbeat])
             time.sleep(0.01)
