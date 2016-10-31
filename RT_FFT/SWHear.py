@@ -32,6 +32,8 @@ class SWHear(object):
         self.lastbeat=[]
         self.firstrunflag = 1
         self.BT=[]
+        self.acorr=[]
+        self.TV=True;
 
     def valid_low_rate(self,device):
         """set the rate to the lowest supported audio rate."""
@@ -156,7 +158,7 @@ class SWHear(object):
         ts=[]
         self.Start = time.time()
         timdif=0
-        while True:
+        while self.TV:
             begn=time.time()
             current_data = self.data
             temp, theta1, theta2, oldmag = onset_timer.onset_detection(np.array(np.append(prev_data, current_data)),
@@ -164,19 +166,29 @@ class SWHear(object):
             progend=time.time()
             df = df + [temp]
             try:
-                time.sleep(self.chunk/self.rate-progend+begn)
+                time.sleep(self.chunk/self.rate)#-progend+begn)
             except:
                 print('Error: Algo took too Long...!!!')
                 #TODO what to todo???... very rare case
             prev_data = current_data
             if(len(df)>=self.adaptval):
                 if(len(self.tdf)>=self.lentdf):
-                    self.tdf=self.tdf[self.adaptval+1:len(self.tdf)]
-                    self.time_stamps=self.time_stamps[self.adaptval+1:len(self.time_stamps)]
+                    self.tdf=self.tdf[self.adaptval:len(self.tdf)-1]
+                    self.time_stamps=self.time_stamps[self.adaptval:len(self.time_stamps)-1]
                 df = np.array(onset_timer.adapt_threshold(df))
                 self.time_stamps = np.concatenate((self.time_stamps, ts), axis=0)
                 self.assigncost(df)
                 self.tdf=np.concatenate((self.tdf,df),axis=0)
+                plt.figure(1)
+                plt.clf()
+                plt.plot(self.tdf)
+                print(len(self.tdf))
+                print(len(self.C))
+                print()
+                plt.plot(np.divide(self.C,10))
+                plt.scatter(self.lastbeat, self.tdf[self.lastbeat])
+                plt.draw()
+                plt.pause(0.05)
                 df=[]
                 ts=[]
                 if timdif!=0:
@@ -187,6 +199,8 @@ class SWHear(object):
 
     def assigncost(self, df):
         if self.bpm != 0:
+            if(len(self.C)>=self.lentdf):
+                self.C=self.C[self.adaptval:len(self.C)-1]
             for j in range(0, len(df)):
                 maxcost = float('-inf')
                 Start = int(round(len(self.tdf) - self.bpm - self.thresh * self.bpm))
@@ -200,8 +214,9 @@ class SWHear(object):
                         cost = 0.9*self.C[i] + df[j]
                     if cost > maxcost:
                         maxcost = cost
-                if (len(self.C) >= len(self.tdf)+len(df)):
-                    self.C = self.C[1:len(self.C) - 1]
+                # print(len(self.tdf)+len(df))
+                # print(len(self.C))
+                # print()
                 self.C = np.append(self.C, [maxcost], axis=0)
             self.lastbeat = len(self.C)-self.bpm-1+np.argmax(self.C[len(self.C)-1-self.bpm:len(self.C)-1])
             if(self.firstrunflag==1):
@@ -209,47 +224,56 @@ class SWHear(object):
                 self.firstrunflag=0
 
     def printbeat(self):
-        while True:
+        while self.TV:
             present_time=time.time()
             try:
                 time.sleep(self.bpm*self.conver/self.rate-(present_time-self.time_stamps[self.lastbeat]))
                 self.BT = np.append(self.BT, [time.time() - self.Start], axis=0)
-                print(self.BT)
+                #print(self.BT)
             except:
                 time.sleep(0.1)
 
     def getbpm(self):
-        while True:
+        while self.TV:
             if(len(self.tdf)<self.acorrwin):
                 time.sleep(1)
             else:
                 a = self.tdf[len(self.tdf) - self.acorrwin + 1:len(self.tdf)];
-                acorr = np.correlate(a,a,"full")
-                acorr = acorr[np.int(len(acorr)/2):len(acorr)]
+                self.acorr = np.correlate(a,a,"full")
+                self.acorr = self.acorr[np.int(len(self.acorr)/2):len(self.acorr)]
                 beatrange = np.arange(np.round(self.fs/3/self.conver),np.round(self.fs/self.conver), dtype='int32')
-                peaks = detect_peaks(acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
+                peaks = detect_peaks(self.acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
                 #TODO Must choose a better way to select BPM .. (Rayleigh Windowing?)
-                self.bpm=peaks[np.argmax(acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
+                self.bpm=peaks[np.argmax(self.acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
                 #time.sleep(0.5*self.bpm*self.conver/44100)
 
                 #pos=getglobalcost.getglobalcost(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],peaks)
                 #print(self.C)
                 #plt.scatter(pos,a[pos])
                 #plt.plot(self.data)
-                #plt.plot(acorr);
-                #plt.scatter(peaks,acorr[peaks]);
-                # plt.plot(range(np.size(acorr)),acorr)
-                # plt.scatter(peaks,acorr[peaks])
+                #plt.plot(self.acorr);
+                #plt.scatter(peaks,self.acorr[peaks]);
+                # plt.plot(range(np.size(self.acorr)),self.acorr)
+                # plt.scatter(peaks,self.acorr[peaks])
 
 if __name__=="__main__":
     ear = SWHear()
     plt.ion()
     ear.stream_start()  # goes forever
-    time.sleep(5)
-    while False:
-        if ear.tdf!=[]:
-            print(time.time()-ear.time_stamps[ear.lastbeat])
-            time.sleep(0.01)
+    #time.sleep(5)
+    while ear.TV:
+        time.sleep(0.001)
+        typedString = input()
+        if typedString =='f' or typedString =='S':
+            f = open('BT/bt %s'%time.time(), 'w')
+            f.write("".join(str(x)+"\n" for x in ear.BT))  # python will convert \n to os.linesep
+            f.close()
+            print("Written to file!")
+        if typedString =='i' or typedString =='S':
+            ear.TV=False
+            print("Interrupted By ME :P")
+            ear.close()
+
     print("DONE")
 
     ''''def assigncost(self,df):
