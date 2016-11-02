@@ -251,12 +251,12 @@ class SWHear(object):
                 self.acorr = np.correlate(a,a,"full")
                 self.acorr = self.acorr[np.int(len(self.acorr)/2):len(self.acorr)]
                 beatrange = np.arange(np.round(self.fs/3/self.conver),np.round(self.fs/self.conver), dtype='int32')
-                #peaks = detect_peaks(self.acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
+                peaks = detect_peaks(self.acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
                 #TODO Must choose a better way to select BPM .. (Rayleigh Windowing?)
-                #self.bpm=peaks[np.argmax(self.acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
+                self.bpm=peaks[np.argmax(self.acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
                 #self.bpm=getperiod(self.acorr)
                 #time.sleep(0.5*self.bpm*self.conver/44100)
-                self.bpm=np.argmax(self.acorr[beatrange])
+                #self.bpm=np.argmax(self.acorr[beatrange])
                 #pos=getglobalcost.getglobalcost(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],peaks)
                 #print(self.C)
                 #plt.scatter(pos,a[pos])
