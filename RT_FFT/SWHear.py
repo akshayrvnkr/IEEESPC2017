@@ -142,10 +142,16 @@ class SWHear(object):
         self.stream_thread_new()
         self.stream_thread_onset()
         self.stream_thread_getbpm()
+        self.step = 1024
+        self.timeres = np.round(44100 * 0.01161)
+        self.pmax = np.round(120 * (512 / self.timeres));
+        self.pmin = np.round(4 * (512 / self.timeres));
+        self.rayparam = np.round(43*(512/self.timeres))
+
 
     def rt_onset(self):
         start = time.time()
-        o_step = 1024
+        o_step = self.step
         o_win_len = o_step * 2
         hlf_win = np.int(o_win_len / 2)
         time.sleep(0.400)
@@ -234,6 +240,11 @@ class SWHear(object):
                 time.sleep(0.1)
 
     def getbpm(self):
+        n = np.arange(1,self.step)
+        wv = (np.divide(n , np.power(self.rayparam , 2)) * np.exp(np.divide(np.power(-n , 2) , (2 * np.power(self.rayparam ,2)))))
+        eps = np.finfo(float).eps
+        wv = wv / np.sum(eps + wv)
+        #getperiod(acf(:,ct),wv,0,step,p.pmin,p.pmax);
         while self.TV:
             if(len(self.tdf)<self.acorrwin):
                 time.sleep(1)
