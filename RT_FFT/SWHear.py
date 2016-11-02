@@ -22,7 +22,7 @@ class SWHear(object):
         self.conver=1024 #Length of step size...
         self.tdf=[]
         self.time_stamps=[]
-        self.acorrwin=100
+        self.acorrwin=200
         self.bpm=0
         self.lentdf=800
         self.thresh=0.2
@@ -182,13 +182,22 @@ class SWHear(object):
                 plt.figure(1)
                 plt.clf()
                 plt.plot(self.tdf)
-                print(len(self.tdf))
-                print(len(self.C))
-                print()
+                print(self.bpm)
+                #print(len(self.C))
+                #print()
                 plt.plot(np.divide(self.C,10))
                 plt.scatter(self.lastbeat, self.tdf[self.lastbeat])
                 plt.draw()
                 plt.pause(0.05)
+                plt.figure(2)
+                if(self.bpm!=0):
+                    plt.clf()
+                    plt.plot(self.acorr)
+                    plt.scatter(self.bpm,self.acorr[self.bpm])
+                    plt.draw()
+                    plt.pause(0.05)
+
+
                 df=[]
                 ts=[]
                 if timdif!=0:
@@ -242,11 +251,12 @@ class SWHear(object):
                 self.acorr = np.correlate(a,a,"full")
                 self.acorr = self.acorr[np.int(len(self.acorr)/2):len(self.acorr)]
                 beatrange = np.arange(np.round(self.fs/3/self.conver),np.round(self.fs/self.conver), dtype='int32')
-                peaks = detect_peaks(self.acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
+                #peaks = detect_peaks(self.acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
                 #TODO Must choose a better way to select BPM .. (Rayleigh Windowing?)
-                self.bpm=peaks[np.argmax(self.acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
+                #self.bpm=peaks[np.argmax(self.acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
+                #self.bpm=getperiod(self.acorr)
                 #time.sleep(0.5*self.bpm*self.conver/44100)
-
+                self.bpm=np.argmax(self.acorr[beatrange])
                 #pos=getglobalcost.getglobalcost(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],peaks)
                 #print(self.C)
                 #plt.scatter(pos,a[pos])
