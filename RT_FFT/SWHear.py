@@ -3,28 +3,26 @@ import time
 import numpy as np
 import threading
 import onset_timer
+import getperiod
 from detect_peaks import detect_peaks
 import getglobalcost
 from scipy.signal import find_peaks_cwt
 import matplotlib.pyplot as plt
 class SWHear(object):
-    """
-    The SWHear class is made to provide access to continuously recorded
-    (and mathematically processed) microphone data.
-    """
-    def __init__(self,device=None,rate=None,chunk=1024):
+
+    def __init__(self,device=None,rate=None,chunk=128):
         """fire up the SWHear class."""
         self.p=pyaudio.PyAudio()
         self.chunk = chunk #2048 # number of data points to read at a time
         self.device=device
         self.rate=rate
-        self.adaptval=15       #TODO error for not Equal to 15 fix
-        self.conver=1024 #Length of step size...
+        self.adaptval=30
+        self.conver=chunk #Length of step size...
         self.tdf=[]
         self.time_stamps=[]
-        self.acorrwin=200
-        self.bpm=0
-        self.lentdf=800
+        self.acorrwin=3*44100/chunk
+        self.bpm=[]
+        self.lentdf=10*44100/chunk
         self.thresh=0.2
         self.C=[]#np.zeros((self.acorrwin,1))
         self.fs=44100
@@ -33,7 +31,8 @@ class SWHear(object):
         self.firstrunflag = 1
         self.BT=[]
         self.acorr=[]
-        self.TV=True;
+        self.TV=True
+        self.samples=2048
 
     def valid_low_rate(self,device):
         """set the rate to the lowest supported audio rate."""
@@ -58,10 +57,6 @@ class SWHear(object):
             return False
 
     def valid_input_devices(self):
-        """
-        See which devices can be opened for microphone input.
-        call this when no PyAudio object is loaded.
-        """
         mics=[]
         for device in range(self.p.get_device_count()):
             if self.valid_test(device):
@@ -114,17 +109,12 @@ class SWHear(object):
 
     def stream_thread_new(self):
         self.t=threading.Thread(target=self.stream_readchunk)
-
-        # self.t.daemon=True
+         # self.t.daemon=True
         self.t.start()
 
     def stream_thread_onset(self):
         self.t2 = threading.Thread(target=self.rt_onset)
         self.t2.start()
-
-    def stream_thread_getbpm(self):
-        self.t3 = threading.Thread(target=self.getbpm)
-        self.t3.start()
 
     def stream_thread_start_beatseq(self):
         self.t4 = threading.Thread(target=self.printbeat)
@@ -141,29 +131,27 @@ class SWHear(object):
                       rate=self.rate,input=True,frames_per_buffer=self.chunk)
         self.stream_thread_new()
         self.stream_thread_onset()
-        self.stream_thread_getbpm()
-        self.step = 1024
-        self.timeres = np.round(44100 * 0.01161)
-        self.pmax = np.round(120 * (512 / self.timeres));
-        self.pmin = np.round(4 * (512 / self.timeres));
-        self.rayparam = np.round(43*(512/self.timeres))
-
 
     def rt_onset(self):
-        start = time.time()
-        o_step = self.step
+        self.start = time.time()
+        o_step = 1024
         o_win_len = o_step * 2
         hlf_win = np.int(o_win_len / 2)
-        time.sleep(0.400)
-        prev_data = self.data
-        time.sleep(self.chunk/self.rate)
+        prev_data=[]
+        time.sleep(0.1)
+        self.Start = time.time()
+        for i in range(1,int(round(self.samples/self.chunk))):
+            prev_data = np.append(prev_data,self.data)
+            time.sleep(self.chunk/self.rate)
         theta1 = np.zeros(hlf_win)
         theta2 = theta1
         oldmag = theta1
         df = []
+        rcf=[]
         ts=[]
-        self.Start = time.time()
+        time.sleep(self.chunk / self.rate)
         timdif=0
+        count=0;
         while self.TV:
             begn=time.time()
             current_data = self.data
@@ -172,50 +160,46 @@ class SWHear(object):
             progend=time.time()
             df = df + [temp]
             try:
-                time.sleep(self.chunk/self.rate)#-progend+begn)
+                time.sleep(self.chunk/self.rate-progend+begn)
             except:
+                count=count+1
+                print(count)
                 print('Error: Algo took too Long...!!!')
-                #TODO: what to todo???... very rare case
-            prev_data = current_data
+
+            prev_data = np.append(prev_data[self.chunk:len(prev_data)],current_data)
             if(len(df)>=self.adaptval):
                 if(len(self.tdf)>=self.lentdf):
-                    self.tdf=self.tdf[self.adaptval:len(self.tdf)-1]
-                    self.time_stamps=self.time_stamps[self.adaptval:len(self.time_stamps)-1]
+                    self.tdf=self.tdf[self.adaptval:len(self.tdf)]
+                    self.time_stamps=self.time_stamps[self.adaptval:len(self.time_stamps)]
                 df = np.array(onset_timer.adapt_threshold(df))
                 self.time_stamps = np.concatenate((self.time_stamps, ts), axis=0)
-                self.assigncost(df)
-                self.tdf=np.concatenate((self.tdf,df),axis=0)
-                plt.figure(1)
-                plt.clf()
-                plt.plot(self.tdf)
-                print(self.bpm)
-                #print(len(self.C))
-                #print()
-                plt.plot(np.divide(self.C,10))
-                plt.scatter(self.lastbeat, self.tdf[self.lastbeat])
-                plt.draw()
-                plt.pause(0.05)
-                plt.figure(2)
-                if(self.bpm!=0):
-                    plt.clf()
-                    plt.plot(self.acorr)
-                    plt.scatter(self.bpm,self.acorr[self.bpm])
-                    plt.draw()
-                    plt.pause(0.05)
+                if (len(self.tdf) >= self.acorrwin):
 
+                    self.pmax = np.round(60/50*(44100/self.conver))
+                    self.pmin = np.round(60/200*(44100/self.conver))
+                    self.raymean = 0.5*(44100/self.conver)
+                    self.rayvar = 0.9
 
+                    temp = self.getbpm()
+                    temp = np.array(onset_timer.adapt_threshold(list(temp)))
+
+                    self.bpm = np.argmax(temp)
+                    print(self.bpm)
+                    self.assigncost(df)
+                self.tdf = np.concatenate((self.tdf, df), axis=0)
                 df=[]
-                ts=[]
+                ts = []
                 if timdif!=0:
                     self.conver = timdif*44100
+
             endn = time.time()
             ts = ts + [endn]
             timdif = endn - begn
 
     def assigncost(self, df):
-        if self.bpm != 0:
+        if self.bpm != 0 :
             if(len(self.C)>=self.lentdf):
-                self.C=self.C[self.adaptval:len(self.C)-1]
+                self.C=self.C[self.adaptval:len(self.C)]
             for j in range(0, len(df)):
                 maxcost = float('-inf')
                 Start = int(round(len(self.tdf) - self.bpm - self.thresh * self.bpm))
@@ -229,9 +213,6 @@ class SWHear(object):
                         cost = 0.9*self.C[i] + df[j]
                     if cost > maxcost:
                         maxcost = cost
-                # print(len(self.tdf)+len(df))
-                # print(len(self.C))
-                # print()
                 self.C = np.append(self.C, [maxcost], axis=0)
             self.lastbeat = len(self.C)-self.bpm-1+np.argmax(self.C[len(self.C)-1-self.bpm:len(self.C)-1])
             if(self.firstrunflag==1):
@@ -244,82 +225,51 @@ class SWHear(object):
             try:
                 time.sleep(self.bpm*self.conver/self.rate-(present_time-self.time_stamps[self.lastbeat]))
                 self.BT = np.append(self.BT, [time.time() - self.Start], axis=0)
-                #print(self.BT)
+                time.sleep(self.bpm*self.conver/self.rate/2)
             except:
-                time.sleep(0.1)
+                time.sleep(0.01)
 
     def getbpm(self):
-        n = np.arange(1,self.step)
-        wv = (np.divide(n , np.power(self.rayparam , 2)) * np.exp(np.divide(np.power(-n , 2) , (2 * np.power(self.rayparam ,2)))))
+        n = np.arange(1,self.acorrwin)
+        #wv = (np.divide(n,np.power(self.rayparam,2))*np.exp(-np.divide(np.power(n,2),(2*np.power(self.rayparam ,2)))))
+        wv=np.exp(-1/2*np.power((np.log2(n/self.raymean)/self.rayvar),2))
         eps = np.finfo(float).eps
         wv = wv / np.sum(eps + wv)
-        #getperiod(acf(:,ct),wv,0,step,p.pmin,p.pmax);
-        while self.TV:
-            if(len(self.tdf)<self.acorrwin):
-                time.sleep(1)
-            else:
-                a = self.tdf[len(self.tdf) - self.acorrwin + 1:len(self.tdf)];
-                self.acorr = np.correlate(a,a,"full")
-                self.acorr = self.acorr[np.int(len(self.acorr)/2):len(self.acorr)]
-                beatrange = np.arange(np.round(self.fs/3/self.conver),np.round(self.fs/self.conver), dtype='int32')
-                peaks = detect_peaks(self.acorr[beatrange],mph=0, mpd=1)# for info look as detect_peaks
-                #TODO Must choose a better way to select BPM .. (Rayleigh Windowing?)
-                self.bpm=peaks[np.argmax(self.acorr[peaks])]+np.round(np.array(np.around(self.fs/3/self.conver),dtype='int32'))
-                #self.bpm=getperiod(self.acorr)
-                #time.sleep(0.5*self.bpm*self.conver/44100)
-                #self.bpm=np.argmax(self.acorr[beatrange])
-                #pos=getglobalcost.getglobalcost(self.tdf[len(self.tdf)-self.acorrwin+1:len(self.tdf)],peaks)
-                #print(self.C)
-                #plt.scatter(pos,a[pos])
-                #plt.plot(self.data)
-                #plt.plot(self.acorr);
-                #plt.scatter(peaks,self.acorr[peaks]);
-                # plt.plot(range(np.size(self.acorr)),self.acorr)
-                # plt.scatter(peaks,self.acorr[peaks])
+        a = self.tdf[len(self.tdf) - self.acorrwin + 1:len(self.tdf)]
+        self.acorr = np.correlate(a,a,"full")
+        self.acorr = self.acorr[np.int(len(self.acorr)/2):len(self.acorr)]
+        bpm=np.multiply(wv,self.acorr)
+
+        # plt.clf()
+        # plt.plot(bpm)
+        #
+        # plt.draw()
+        # plt.pause(0.1)
+
+        #bpm=getperiod.getperiod(self.acorr, wv, 0, self.acorrwin, self.pmin, self.pmax)
+        return bpm
 
 if __name__=="__main__":
     ear = SWHear()
     plt.ion()
     ear.stream_start()  # goes forever
-    #time.sleep(5)
     while ear.TV:
         time.sleep(0.001)
         typedString = input()
         if typedString =='f' or typedString =='S':
-            f = open('BT/bt %s'%time.time(), 'w')
-            f.write("".join(str(x)+"\n" for x in ear.BT))  # python will convert \n to os.linesep
+            f = open('BT/tdf %s'%time.time(), 'w')
+            f.write("".join(str(x)+"\n" for x in ear.tdf))  # python will convert \n to os.linesep
+            f2 = open('BT/bt %s' % time.time(), 'w')
+            f2.write("".join(str(x) + "\n" for x in ear.BT))  # python will convert \n to os.linesep
             f.close()
+            f2.close()
+
             print("Written to file!")
         if typedString =='i' or typedString =='S':
+            stop=time.time()
+            print(len(ear.tdf))
             ear.TV=False
+            print(stop-ear.start)
             print("Interrupted By ME :P")
             ear.close()
-
     print("DONE")
-
-    ''''def assigncost(self,df):
-           for j in range(0,len(df)):
-               mincost = float('inf')
-               if self.bpm!=0:
-                   Start=int(round(len(self.C)-self.bpm-self.thresh*self.bpm))
-                   Stop=int(round(len(self.tdf)-self.bpm+self.thresh*self.bpm))
-                   for i in range(Start,Stop):
-                           if(i<0):
-                               cost=0.9*sum(pow(np.array(self.tdf[0:len(self.tdf)-1]), 2))
-                           else:
-                               if (i > len(self.C) - 1):
-                                   if self.C==[]:
-                                       self.C=np.zeros((len(self.tdf),1))
-                                   else:
-                                       self.C=np.concatenate((self.C,np.zeros((len(self.tdf-len(self.C))),1)),axis=0)
-                               cost = self.C[i] + 0.9*sum(pow(np.array(self.tdf[i:len(self.tdf)-1]), 2))
-                   if cost < mincost:
-                       mincost = cost
-                   plt.clf()
-                   plt.plot(self.C)
-                   plt.pause(0.1)
-                   plt.draw()
-                   print(self.bpm)
-                   if (len(self.C) >= self.lentdf):
-                       self.C = self.C[1:len(self.C)-1]
-                   self.C = np.append(self.C, [mincost], axis=0)'''''
