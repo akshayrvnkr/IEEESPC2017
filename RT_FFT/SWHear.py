@@ -8,6 +8,12 @@ from detect_peaks import detect_peaks
 import getglobalcost
 from scipy.signal import find_peaks_cwt
 import matplotlib.pyplot as plt
+import cProfile, pstats
+from io import StringIO
+import winsound
+
+
+
 class SWHear(object):
 
     def __init__(self,device=None,rate=None,chunk=128):
@@ -45,10 +51,10 @@ class SWHear(object):
     def valid_test(self,device,rate=44100):
         """given a device ID and a rate, return TRUE/False if it's valid."""
         try:
-            self.info=self.p.get_device_info_by_index(device)
+            self.info = self.p.get_device_info_by_index(device)
             if not self.info["maxInputChannels"]>0:
                 return False
-            stream=self.p.open(format=pyaudio.paInt16,channels=1,
+            stream = self.p.open(format=pyaudio.paInt16,channels=1,
                input_device_index=device,frames_per_buffer=self.chunk,
                rate=int(self.info["defaultSampleRate"]),input=True)
             stream.close()
@@ -111,6 +117,14 @@ class SWHear(object):
         self.t=threading.Thread(target=self.stream_readchunk)
          # self.t.daemon=True
         self.t.start()
+
+    def stream_thread_beep(self):
+        self.t = threading.Thread(target=self.beep)
+        # self.t.daemon=True
+        self.t.start()
+
+    def beep(self,freq=300,hold_time=1000):
+        winsound.Beep(freq,hold_time) #(frequency,time in ms)
 
     def stream_thread_onset(self):
         self.t2 = threading.Thread(target=self.rt_onset)
@@ -250,6 +264,7 @@ class SWHear(object):
         return bpm
 
 if __name__=="__main__":
+    st_time = time.time()
     ear = SWHear()
     plt.ion()
     ear.stream_start()  # goes forever
@@ -263,7 +278,6 @@ if __name__=="__main__":
             f2.write("".join(str(x) + "\n" for x in ear.BT))  # python will convert \n to os.linesep
             f.close()
             f2.close()
-
             print("Written to file!")
         if typedString =='i' or typedString =='S':
             stop=time.time()
