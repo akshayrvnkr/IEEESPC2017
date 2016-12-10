@@ -43,7 +43,6 @@ def onset(x=None, fs=None):
         theta = angle(X)
         # complexsd part
         dev = princarg(theta - 2 * theta1 + theta2)
-
         df(k).lvalue = sum(sqrt((real(meas)) **elpow** 2 + (imag(meas)) **elpow** 2))
         # update vectors
         theta2 = theta1

@@ -1,11 +1,4 @@
-import time
-import threading
 import numpy as np
-from scipy import interpolate
-from scipy.io import wavfile
-import matplotlib.pyplot as plt
-
-
 
 #rpi_gpio_out = 0
 # lbo = 0
@@ -43,8 +36,10 @@ def adapt_threshold(df,pre=8,post=7):
 	return (df1>0)*df1
 
 
-def onset_detection(x, theta1, theta2, oldmag, fs=44100):
-	o_step  	= 1024  # 1024
+def onset_detection(x, xold, theta1, theta2, oldmag, fs=44100):
+	x=np.append(xold,x)
+	x=np.diff(x)
+	o_step  	= 1024
 	o_win_len   = o_step * 2
 	win_hann 	= np.hanning(o_win_len)
 	df = []
@@ -57,21 +52,12 @@ def onset_detection(x, theta1, theta2, oldmag, fs=44100):
 	df = np.sum(np.sqrt(np.power((np.real(meas)),2) + np.power((np.imag(meas)),2)))
 	return (df, theta, theta1, mag)
 
+def part_adapt_thresh(inp):
+	m=1.65*np.mean(inp);
+	inp=inp-m
+	out=inp*(inp>0)
+	return out
 
-def simple(x):
-	return x
 
-	# df = spline(1:length(x) / length(df):length(x), df, 1:length(x));
-# a = wavfile.read("F:\Edu\SPC-2017\open\open_001.wav");
-# x = a[1][0:1024*17-1]
-# x = x/pow(2,15)
-# start = time.time()
-# ac = onset_detection(x,a[0])
-# stop = time.time()
-# print(stop-start)
-# plt.plot(ac)
-# plt.show(ac.any)
-# timer_thread = threading.Thread(master_timer(lbo,bri))
-#timer_thread.start()
-#print("Abc",rpi_gpio_out)
+
 
