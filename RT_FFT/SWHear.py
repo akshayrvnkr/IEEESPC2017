@@ -231,7 +231,7 @@ class SWHear(object):
                 self.firstrunflag=0
 
     def printbeat(self):
-        while self.TV:0
+        while self.TV:
             present_time=time.time()
             try:
                 #print('BEAT')
