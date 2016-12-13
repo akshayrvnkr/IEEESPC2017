@@ -53,7 +53,7 @@ def onset_detection(x, xold, theta1, theta2, oldmag, fs=44100):
 	return (df, theta, theta1, mag)
 
 def part_adapt_thresh(inp):
-	m=1.65*np.mean(inp);
+	m=np.mean(inp);
 	inp=inp-m
 	out=inp*(inp>0)
 	return out

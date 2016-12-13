@@ -25,7 +25,7 @@ class SWHear(object):
         self.acorrwin=3*44100/chunk
         self.bpm=[]
         self.lentdf=300*44100/chunk
-        self.thresh=0.2
+        self.thresh=0.1
         self.C=[]#np.zeros((self.acorrwin,1))
         self.fs=44100
         self.Start=[]
@@ -159,8 +159,9 @@ class SWHear(object):
         df = []
         ts=[]
         timdif=0
-        count=0;
-        xold=0;
+        endn=self.Start
+        count=0
+        xold=0
         while self.TV:
             begn=time.time()
             current_data=self.data
@@ -168,6 +169,7 @@ class SWHear(object):
                                                                        theta1, theta2, oldmag, self.rate)
             progend=time.time()
             df = df + [temp]
+            ts = ts + [endn]
             xold=current_data[len(current_data)-1]
             try:
                 time.sleep(self.chunk/self.rate-progend+begn)
@@ -175,80 +177,87 @@ class SWHear(object):
                 count=count+1
                 print(count)
                 print('Error: Algo took too Long...!!!')
-
             prev_data = np.append(prev_data[self.chunk:len(prev_data)],current_data)
+            
             if(len(df)>=self.adaptval):
                 if(len(self.tdf)>=self.lentdf):
-                    self.tdf=self.tdf[self.adaptval:len(self.tdf)]
-                    self.time_stamps=self.time_stamps[self.adaptval:len(self.time_stamps)]
-                df = np.array(onset_timer.part_adapt_thresh(df))
-                self.time_stamps = np.concatenate((self.time_stamps, ts), axis=0)
-                if (len(self.tdf) >= self.acorrwin):
+                    self.tdf=self.tdf[1:]
+                    self.time_stamps=self.time_stamps[1:]
+                dfnew = np.array(onset_timer.part_adapt_thresh(df))
+                if(len(self.tdf)==0):
+                    self.tdf=dfnew
+                    self.time_stamps=ts
+                    self.assigncost(dfnew)
+                else:
+                    self.tdf = np.append(self.tdf, [dfnew[len(dfnew)-1]], axis=0)
+                    self.time_stamps = np.append(self.time_stamps, [ts[len(ts)-1]],axis=0)
+                    self.assigncost(dfnew[len(dfnew)-1])
+                df = df[1:]
+                ts = ts[1:]
 
+                if (len(self.tdf) >= self.acorrwin and len(self.tdf)%15==0):
                     self.pmax = np.round(60/60*(44100/self.conver))
                     self.pmin = np.round(60/120*(44100/self.conver))
                     temp = self.getbpm()
                     temp = np.array(onset_timer.adapt_threshold(list(temp)))
-                    self.abpm = np.concatenate((self.abpm, temp), axis=0);
+                    self.abpm = np.concatenate((self.abpm, temp), axis=0)
                     temp = np.argmax(temp)
                     self.bepm = self.bepm + [temp]
                     self.bpm=np.median(self.bepm[min(0,len(self.bepm)-10):])
-
                     self.bepmdebug = self.bepmdebug + [self.bpm]
 
-                    self.assigncost(df)
-                self.tdf = np.concatenate((self.tdf, df), axis=0)
-                df=[]
-                ts = []
-                if timdif!=0:
-                    self.conver = timdif*44100
-
             endn = time.time()
-            ts = ts + [endn]
             timdif = endn - begn
+            if timdif != 0:
+                self.conver = 1024#timdif * 44100
 
     def assigncost(self, df):
-        if self.bpm != 0 :
+        if np.size(self.bpm)!=0 and self.bpm!=0 :
             if(len(self.C)>=self.lentdf):
-                self.C=self.C[self.adaptval:len(self.C)]
-            for j in range(0, len(df)):
+                self.C=self.C[1:]
+            for j in range(0, np.size(df)):
                 maxcost = float('-inf')
                 Start = int(round(len(self.tdf) - self.bpm - self.thresh * self.bpm))
                 Stop = int(round(len(self.tdf) - self.bpm + self.thresh * self.bpm+1))
                 for i in range(Start, Stop):
                     if (i < 0):
-                        cost = df[j]
+                        if(np.size(df)==1):
+                            cost=df
+                        else:
+                            cost = df[j]
                     else:
-                        if (i > len(self.C) - 1):
+                        if (i>len(self.C)-1):
                             self.C = self.tdf
-                        cost = 0.9*self.C[i] + df[j]
+                        if(np.size(df)==1):
+                            cost = 0.9*self.C[i] + df
+                        else:
+                            cost = 0.9*self.C[i] + df[j]
                     if cost > maxcost:
                         maxcost = cost
                 self.C = np.append(self.C, [maxcost], axis=0)
-            self.lastbeat = len(self.C)-self.bpm-1+np.argmax(self.C[len(self.C)-1-self.bpm:len(self.C)-1])
             if(self.firstrunflag==1):
                 self.stream_thread_start_beatseq()
                 self.firstrunflag=0
+                self.lastbeat =int(round(len(self.C)-self.bpm-1))+np.argmax(self.C[int(round(len(self.C)-1-self.bpm)):len(self.C)-1])
+            else:
+                try:
+                    part_array=self.C[int(round(self.lastbeat+self.bpm*(1-self.thresh))):int(round(self.lastbeat+self.bpm*(1+self.thresh)))]
+                    if (len(part_array)==(int(round(self.lastbeat+self.bpm*(1+self.thresh)))-int(round(self.lastbeat+self.bpm*(1-self.thresh))))):
+                        self.lastbeat=int(round(self.lastbeat+self.bpm*(1-self.thresh)))+np.argmax(part_array)
+                except:
+                    self.lastbeat=self.lastbeat
 
     def printbeat(self):
+        oldbeat=0;
         while self.TV:
             present_time=time.time()
             try:
-                #print('BEAT')
                 time.sleep(self.bpm*self.conver/self.rate-(present_time-self.time_stamps[self.lastbeat]))
-                self.BT = np.append(self.BT, [time.time() - self.Start], axis=0)
+                oldbeat=time.time()
+                self.BT = np.append(self.BT,[time.time()-self.Start],axis=0)
                 playbeep.playbeep(44100,1000,0.15)
-                time.sleep(self.bpm*self.conver/self.rate/2)
             except:
-                try:
-                    time.sleep(2*self.bpm * self.conver / self.rate - (present_time - self.time_stamps[self.lastbeat]))
-                    self.BT = np.append(self.BT, [time.time() - self.Start], axis=0)
-                    playbeep.playbeep(44100, 5000, 0.15)
-                    time.sleep(self.bpm * self.conver / self.rate / 2)
-                except:
-                    #print()
-                    playbeep.playbeep(44100, 10000, 0.15)
-                    time.sleep(self.bpm*self.conver/self.rate/4)
+                time.sleep(0.001)
 
     def getbpm(self):
         n = np.arange(1,self.acorrwin)
@@ -256,9 +265,9 @@ class SWHear(object):
         eps = np.finfo(float).eps
         wv = wv / np.sum(eps + wv)
 
-        a = self.tdf[len(self.tdf) - self.acorrwin + 1:len(self.tdf)]
+        a = self.tdf[int(round(len(self.tdf)-self.acorrwin+1)):]
         self.acorr = np.correlate(a,a, "full")
-        self.acorr = self.acorr[np.int(len(self.acorr) / 2):len(self.acorr)]
+        self.acorr = self.acorr[np.int(len(self.acorr) / 2):]
         self.acorr=np.append(0,self.acorr)
         rcf = np.zeros(len(self.acorr))
         numelem = 4
@@ -277,13 +286,13 @@ if __name__=="__main__":
         time.sleep(0.001)
         typedString = input()
         if typedString =='f' or typedString =='S':
-            f = open('BT/DF %s'%time.time(), 'w')
+            f = open('BT/DF', 'w')
             f.write("".join(str(x)+"\n" for x in ear.tdf))  # python will convert \n to os.linesep
-            f2 = open('BT/tabpm %s' % time.time(), 'w')
+            f2 = open('BT/tabpm', 'w')
             f2.write("".join(str(x) + "\n" for x in ear.C))  # python will convert \n to os.linesep
-            f3 = open('BT/tbpm %s' % time.time(), 'w')
+            f3 = open('BT/tbpm', 'w')
             f3.write("".join(str(x) + "\n" for x in ear.bepmdebug))  # python will convert \n to os.linesep
-            f4 = open('BT/tbt %s' % time.time(), 'w')
+            f4 = open('BT/tbt', 'w')
             f4.write("".join(str(x) + "\n" for x in ear.BT))  # python will convert \n to os.linesep
             f2.close()
             f3.close()
