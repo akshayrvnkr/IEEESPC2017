@@ -6,6 +6,7 @@ import onset_timer
 import playbeep
 from scipy import interpolate
 import getperiod
+import os
 #from detect_peaks import detect_peaks
 import getglobalcost
 from scipy.signal import find_peaks_cwt
@@ -23,6 +24,7 @@ class SWHear(object):
         self.tdf=[]
         self.time_stamps=[]
         self.acorrwin=3*44100/chunk
+        self.acorrmaxwin=6*44100/chunk
         self.bpm=[]
         self.lentdf=300*44100/chunk
         self.thresh=0.1
@@ -41,6 +43,7 @@ class SWHear(object):
 
 
         self.bepmdebug=[]
+        self.lbdebug=[];
 
     def valid_low_rate(self,device):
         """set the rate to the lowest supported audio rate."""
@@ -195,7 +198,7 @@ class SWHear(object):
                 df = df[1:]
                 ts = ts[1:]
 
-                if (len(self.tdf) >= self.acorrwin and len(self.tdf)%15==0):
+                if (len(self.tdf) >= self.acorrwin):
                     self.pmax = np.round(60/60*(44100/self.conver))
                     self.pmin = np.round(60/120*(44100/self.conver))
                     temp = self.getbpm()
@@ -203,9 +206,8 @@ class SWHear(object):
                     self.abpm = np.concatenate((self.abpm, temp), axis=0)
                     temp = np.argmax(temp)
                     self.bepm = self.bepm + [temp]
-                    self.bpm=np.median(self.bepm[min(0,len(self.bepm)-10):])
+                    self.bpm=np.median(self.bepm[min(0,len(self.bepm)-int(round(3*44100/1024))):])
                     self.bepmdebug = self.bepmdebug + [self.bpm]
-
             endn = time.time()
             timdif = endn - begn
             if timdif != 0:
@@ -228,6 +230,7 @@ class SWHear(object):
                     else:
                         if (i>len(self.C)-1):
                             self.C = self.tdf
+                            return
                         if(np.size(df)==1):
                             cost = 0.9*self.C[i] + df
                         else:
@@ -239,23 +242,25 @@ class SWHear(object):
                 self.stream_thread_start_beatseq()
                 self.firstrunflag=0
                 self.lastbeat =int(round(len(self.C)-self.bpm-1))+np.argmax(self.C[int(round(len(self.C)-1-self.bpm)):len(self.C)-1])
+                self.lbdebug=self.time_stamps[self.lastbeat]-self.Start
             else:
+                oldbeat=self.lastbeat
                 try:
-                    part_array=self.C[int(round(self.lastbeat+self.bpm*(1-self.thresh))):int(round(self.lastbeat+self.bpm*(1+self.thresh)))]
-                    if (len(part_array)==(int(round(self.lastbeat+self.bpm*(1+self.thresh)))-int(round(self.lastbeat+self.bpm*(1-self.thresh))))):
+                    part_array=self.C[int(round(self.lastbeat+self.bpm*(1-self.thresh))):int(round(self.lastbeat+self.bpm*(1+self.thresh)))+1]
+                    if (len(part_array)==(int(round(self.lastbeat+self.bpm*(1+self.thresh)))+1-int(round(self.lastbeat+self.bpm*(1-self.thresh))))):
                         self.lastbeat=int(round(self.lastbeat+self.bpm*(1-self.thresh)))+np.argmax(part_array)
+                        self.lbdebug=np.append(self.lbdebug,self.time_stamps[self.lastbeat]-self.Start)
                 except:
                     self.lastbeat=self.lastbeat
 
     def printbeat(self):
-        oldbeat=0;
         while self.TV:
             present_time=time.time()
             try:
                 time.sleep(self.bpm*self.conver/self.rate-(present_time-self.time_stamps[self.lastbeat]))
-                oldbeat=time.time()
                 self.BT = np.append(self.BT,[time.time()-self.Start],axis=0)
-                playbeep.playbeep(44100,1000,0.15)
+                time.sleep(self.bpm*self.conver/(self.rate*2))
+                #playbeep.playbeep(44100,1000,0.15)
             except:
                 time.sleep(0.001)
 
@@ -264,8 +269,15 @@ class SWHear(object):
         wv = (np.divide(n,np.power(self.rayparam,2))*np.exp(-np.divide(np.power(n,2),(2*np.power(self.rayparam ,2)))))
         eps = np.finfo(float).eps
         wv = wv / np.sum(eps + wv)
-
-        a = self.tdf[int(round(len(self.tdf)-self.acorrwin+1)):]
+        if(len(self.tdf)>=self.acorrmaxwin):
+            n = np.arange(1, self.acorrmaxwin)
+            wv = (np.divide(n, np.power(self.rayparam, 2)) * np.exp(
+                -np.divide(np.power(n, 2), (2 * np.power(self.rayparam, 2)))))
+            eps = np.finfo(float).eps
+            wv = wv / np.sum(eps + wv)
+            a = self.tdf[int(round(len(self.tdf)-self.acorrmaxwin + 1)):]
+        else:
+            a = self.tdf[int(round(len(self.tdf)-self.acorrwin+1)):]
         self.acorr = np.correlate(a,a, "full")
         self.acorr = self.acorr[np.int(len(self.acorr) / 2):]
         self.acorr=np.append(0,self.acorr)
@@ -280,25 +292,25 @@ class SWHear(object):
 
 if __name__=="__main__":
     ear = SWHear()
-    plt.ion()
+    song_no=input('Enter Song Number :')
     ear.stream_start()  # goes forever
     while ear.TV:
         time.sleep(0.001)
         typedString = input()
         if typedString =='f' or typedString =='S':
-            f = open('BT/DF', 'w')
-            f.write("".join(str(x)+"\n" for x in ear.tdf))  # python will convert \n to os.linesep
-            f2 = open('BT/tabpm', 'w')
-            f2.write("".join(str(x) + "\n" for x in ear.C))  # python will convert \n to os.linesep
-            f3 = open('BT/tbpm', 'w')
-            f3.write("".join(str(x) + "\n" for x in ear.bepmdebug))  # python will convert \n to os.linesep
-            f4 = open('BT/tbt', 'w')
+            os.mkdir('BT/'+song_no)
+            f = open('BT/'+song_no+'/Onsets', 'w')
+            f.write("".join(str(x)+"\n" for x in ear.lbdebug))  # python will convert \n to os.linesep
+            f2 = open('BT/'+song_no+'/Cost', 'w')
+            f2.write("".join(str(x) + "\n" for x in ear.bepmdebug))  # python will convert \n to os.linesep
+            f3 = open('BT/'+song_no+'/BPM', 'w')
+            f3.write("".join(str(x) + "\n" for x in (ear.time_stamps-ear.Start)))  # python will convert \n to os.linesep
+            f4 = open('BT/'+song_no+'/Beat', 'w')
             f4.write("".join(str(x) + "\n" for x in ear.BT))  # python will convert \n to os.linesep
             f2.close()
             f3.close()
             f4.close()
             f.close()
-
             print("Written to file!")
         if typedString =='i' or typedString =='S':
             stop=time.time()
