@@ -8,7 +8,7 @@ import os
 import matplotlib.pyplot as plt
 
 
-class SWHear(object):
+class SWHearAll(object):
     def __init__(self, device=None, rate=None, chunk=1024):
         """fire up the SWHear class."""
         self.p = pyaudio.PyAudio()
@@ -202,7 +202,8 @@ class SWHear(object):
                     self.abpm = np.concatenate((self.abpm, temp), axis=0)
                     temp = np.argmax(temp)
                     self.bepm = self.bepm + [temp]
-                    self.bpm = np.median(self.bepm[min(0, len(self.bepm) - int(round(10*44100/1024))):])
+                    self.bpm = np.median(self.bepm[min(0, len(self.bepm) - int(round(3 * 44100 / 1024))):])
+                    print(self.bpm)
                     self.bepmdebug = self.bepmdebug + [self.bpm]
             endn = time.time()
             timdif = endn - begn
@@ -259,7 +260,7 @@ class SWHear(object):
                 time.sleep(self.bpm * self.conver / self.rate - (present_time - self.time_stamps[self.lastbeat]))
                 self.BT = np.append(self.BT, [time.time() - self.Start], axis=0)
                 # time.sleep(self.bpm * self.conver / (self.rate * 2))
-                playbeep.playbeep(44100,1000,0.15)
+                # playbeep.playbeep(44100,1000,0.15)
             except:
                 time.sleep(0.001)
 
@@ -278,12 +279,12 @@ class SWHear(object):
             a = self.tdf[int(round(len(self.tdf) - self.acorrmaxwin + 1)):]
         else:
             a = self.tdf[int(round(len(self.tdf) - self.acorrwin + 1)):]
-        # afft=np.fft.fft(a,2*len(a))
-        # afft=afft*np.conj(afft)
-        # self.acorr=np.fft.ifft(afft)
-#        self.acorr=self.acorr[0:len(a)]/np.arange(len(a),0,-1)
-        self.acorr = np.correlate(a, a, "full")
-        self.acorr = self.acorr[np.int(len(self.acorr) / 2):]
+        afft=np.fft.fft(a,2*len(a))
+        afft=afft*np.conj(afft)
+        self.acorr=np.fft.ifft(afft)
+        self.acorr=self.acorr[0:len(a)/2]/np.arange(len(a)/2,0,-1)
+        # self.acorr = np.correlate(a, a, "full")
+        # self.acorr = self.acorr[np.int(len(self.acorr) / 2):]
         self.acorr = np.append(0, self.acorr)
         rcf = np.zeros(len(self.acorr))
         numelem = 4
@@ -294,37 +295,38 @@ class SWHear(object):
                         rcf[i] = rcf[i] + (self.acorr[a * i + b] * wv[i]) / (2 * a - 1)
         return rcf
 
-if __name__=="__main__":
-    ear = SWHear()
-    song_no=input('Enter Song Number :')
-    ear.stream_start()  # goes forever
-    while ear.TV:
-        time.sleep(0.001)
-        typedString = input()
-        if typedString =='f' or typedString =='S':
+if __name__ == "__main__":
+    input('Press a Key to Start : ')
+    for song_no in range(1,26):
+        input('Start :')
+        ear = SWHearAll()
+        ear.stream_start()
+        strsn=str(song_no)
+        while ear.TV:
             try:
-                os.mkdir('BT/'+song_no)
+                os.mkdir('AllRun/' + strsn)
             except:
                 pass
-            f = open('BT/'+song_no+'/LastBeat', 'w')
-            f.write("".join(str(x)+"\n" for x in ear.lbdebug))  # python will convert \n to os.linesep
-            f2 = open('BT/'+song_no+'/BPM', 'w')
+            input('Stop :')
+            f = open('AllRun/' + strsn + '/LastBeat', 'w')
+            f.write("".join(str(x) + "\n" for x in ear.lbdebug))  # python will convert \n to os.linesep
+            f2 = open('AllRun/' + strsn + '/BPM', 'w')
             f2.write("".join(str(x) + "\n" for x in ear.bepmdebug))  # python will convert \n to os.linesep
-            f3 = open('BT/'+song_no+'/Onsets', 'w')
-            f3.write("".join(str(x) + "\n" for x in ear.tdf))  # python will convert \n to os.linesep
-            f4 = open('BT/'+song_no+'/Beat', 'w')
-            f4.write("".join(str(x) + "\n" for x in ear.BT))  # python will convert \n to os.linesep
+            f3 = open('AllRun/' + strsn + '/Time', 'w')
+            f3.write("".join(str(x) + "\n" for x in (ear.time_stamps - ear.Start)))  # python will convert \n to os.linesep
+            f4 = open('AllRun/' + strsn + '/Beat', 'w')
+            f4.write("".join(str(x) + "\n" for x in ear.BT))
+            f5 = open('AllRun/' + strsn + '/Onsets', 'w')
+            f5.write("".join(str(x) + "\n" for x in ear.tdf))
             f2.close()
             f3.close()
             f4.close()
+            f5.close()
             f.close()
             print("Written to file!")
-        if typedString =='i' or typedString =='S':
-            stop=time.time()
+            stop = time.time()
             print(len(ear.tdf))
-            ear.TV=False
-            print(stop-ear.start)
-            print("Interrupted By ME :P")
+            ear.TV = False
+            print(stop - ear.start)
             ear.close()
-    print("DONE")
-    # Enter song no and start playing song at the same time all the above data is saved when  u press S
+        print(strsn+' file done')
