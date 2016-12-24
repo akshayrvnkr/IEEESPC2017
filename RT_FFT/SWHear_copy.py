@@ -5,13 +5,17 @@ import threading
 import onset_timer
 import playbeep
 import os
+import wave
+import glob
 import matplotlib.pyplot as plt
 
 
 class SWHear(object):
-    def __init__(self, device=None, rate=None, chunk=1024):
+    def __init__(self, filename,song_no=0, device=None, rate=None, chunk=1024):
         """fire up the SWHear class."""
         self.p = pyaudio.PyAudio()
+        self.song_no=str(song_no)
+        self.filename=filename
         self.chunk = chunk  # 2048 # number of data points to read at a time
         self.device = device
         self.rate = rate
@@ -20,7 +24,7 @@ class SWHear(object):
         self.tdf = []
         self.time_stamps = []
         self.acorrwin = 3 * 44100 / chunk
-        self.acorrmaxwin = 6 * 44100 / chunk
+        self.acorrmaxwin = 3 * 44100 / chunk
         self.bpm = []
         self.lentdf = 300 * 44100 / chunk
         self.thresh = 0.1
@@ -36,9 +40,9 @@ class SWHear(object):
         self.rayparam = np.round(43 * (512 / 512))
         self.abpm = []
         self.bepm = []
-
         self.bepmdebug = []
         self.lbdebug = []
+        self.ended=False
 
     def valid_low_rate(self, device):
         """set the rate to the lowest supported audio rate."""
@@ -125,6 +129,10 @@ class SWHear(object):
         self.t4 = threading.Thread(target=self.printbeat)
         self.t4.start()
 
+    def stream_thread_start_song(self):
+        self.t5 = threading.Thread(target=self.playsong)
+        self.t5.start()
+
     def stream_start(self):
         """adds data to self.data until termination signal"""
         self.initiate()
@@ -136,6 +144,49 @@ class SWHear(object):
                                   rate=self.rate, input=True, frames_per_buffer=self.chunk)
         self.stream_thread_new()
         self.stream_thread_onset()
+        self.stream_thread_start_song()
+
+    def playsong(self):
+        wf = wave.open(self.filename, 'rb')
+        p = pyaudio.PyAudio()
+        stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
+                        channels=wf.getnchannels(),
+                        rate=wf.getframerate(),
+                        output=True)
+
+        data = wf.readframes(self.chunk)
+        while len(data) > 0:
+            stream.write(data)
+            data = wf.readframes(self.chunk)
+
+        try:
+            os.mkdir('BT/'+self.song_no)
+        except:
+            pass
+        f = open('BT/'+self.song_no+'/LastBeat', 'w')
+        f.write("".join(str(x)+"\n" for x in self.lbdebug))  # python will convert \n to os.linesep
+        f2 = open('BT/'+self.song_no+'/BPM', 'w')
+        f2.write("".join(str(x) + "\n" for x in self.bepmdebug))  # python will convert \n to os.linesep
+        f3 = open('BT/'+self.song_no+'/Onsets', 'w')
+        f3.write("".join(str(x) + "\n" for x in self.tdf))  # python will convert \n to os.linesep
+        f4 = open('BT/'+self.song_no+'/Beat', 'w')
+        f4.write("".join(str(x) + "\n" for x in self.BT))  # python will convert \n to os.linesep
+        f5 = open('BT/' + self.song_no + '/Cost', 'w')
+        f5.write("".join(str(x) + "\n" for x in self.C))  # python will convert \n to os.linesep
+
+        f2.close()
+        f3.close()
+        f4.close()
+        f5.close()
+        f.close()
+        print("Written to file!")
+        stop=time.time()
+        print(len(self.tdf))
+        self.TV=False
+        print(stop-self.start)
+        print("Interrupted By ME :P")
+        self.close()
+        self.ended=True
 
     def rt_onset(self):
         self.start = time.time()
@@ -202,6 +253,9 @@ class SWHear(object):
                     temp = np.argmax(temp)
                     self.bepm = self.bepm + [temp]
                     self.bpm = np.median(self.bepm[min(0, len(self.bepm) - 10):])
+                    if(self.bepmdebug!=[]):
+                        if(abs(self.bpm-self.bepmdebug[len(self.bepmdebug)-1])>self.bpm*self.thresh):
+                            self.C=[]
                     self.bepmdebug = self.bepmdebug + [self.bpm]
 
 
@@ -255,12 +309,11 @@ class SWHear(object):
                     self.lastbeat = self.lastbeat
 
     def printbeat(self):
-        #while self.TV:
         present_time = time.time()
         try:
             time.sleep(self.bpm * self.conver / self.rate - (present_time - self.time_stamps[self.lastbeat]))
             self.BT = np.append(self.BT, [time.time() - self.Start], axis=0)
-            playbeep.playbeep(44100,1000,0.15)
+            #time.sleep(0.15)
         except:
             time.sleep(0.001)
 
@@ -292,40 +345,15 @@ class SWHear(object):
         return rcf
 
 if __name__=="__main__":
-    ear = SWHear()
-    song_no=input('Enter Song Number :')
-    ear.stream_start()  # goes forever
-    while ear.TV:
-        time.sleep(0.001)
-        typedString = input()
-        if typedString =='f' or typedString =='S':
-            try:
-                os.mkdir('BT/'+song_no)
-            except:
-                pass
-            f = open('BT/'+song_no+'/LastBeat', 'w')
-            f.write("".join(str(x)+"\n" for x in ear.lbdebug))  # python will convert \n to os.linesep
-            f2 = open('BT/'+song_no+'/BPM', 'w')
-            f2.write("".join(str(x) + "\n" for x in ear.bepmdebug))  # python will convert \n to os.linesep
-            f3 = open('BT/'+song_no+'/Onsets', 'w')
-            f3.write("".join(str(x) + "\n" for x in ear.tdf))  # python will convert \n to os.linesep
-            f4 = open('BT/'+song_no+'/Beat', 'w')
-            f4.write("".join(str(x) + "\n" for x in ear.BT))  # python will convert \n to os.linesep
-            f5 = open('BT/' + song_no + '/Cost', 'w')
-            f5.write("".join(str(x) + "\n" for x in ear.C))  # python will convert \n to os.linesep
+    files=glob.glob("/media/chaithya/Studies Related/Projects/SPC-2017/training_set/open/*.wav") #Enter file dir here . give ctr for folder name (use song no preferably)
+    ctr=1
+    for song in files:
+        ear = SWHear(song,ctr)
+        ear.stream_start()
+        print(ctr)
+        while ear.ended==False:
+            time.sleep(0.1)
+        ctr=ctr+1
+        if ctr>25:
+            break
 
-            f2.close()
-            f3.close()
-            f4.close()
-            f5.close()
-            f.close()
-            print("Written to file!")
-        if typedString =='i' or typedString =='S':
-            stop=time.time()
-            print(len(ear.tdf))
-            ear.TV=False
-            print(stop-ear.start)
-            print("Interrupted By ME :P")
-            ear.close()
-    print("DONE")
-    # Enter song no and start playing song at the same time all the above data is saved when  u press S
